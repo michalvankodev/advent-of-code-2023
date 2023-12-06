@@ -45,7 +45,13 @@ let play_game source_mappings line =
   match line with
   | l when String.is_substring ~substring:"seeds" l ->
       let seeds = parse_seeds line in
-      List.map seeds ~f:(fun seed -> (seed, NotMapped))
+      let pairs = List.chunks_of ~length:2 seeds in
+      let ranges = List.map pairs ~f:(fun pair -> 
+      match pair with
+       | [start; range] -> List.range start (start+range-1) 
+       | _ -> []
+      ) in
+    List.concat ranges |> List.map ~f:(fun seed -> (seed, NotMapped))
   | l when String.contains l ':' -> List.map source_mappings ~f:reset_mapping
   | _ -> List.map source_mappings ~f:(get_next_type line)
  
