@@ -3,10 +3,12 @@ open Core
 type mapping_type = 
     | Mapped  
     | NotMapped
+    | ToBeMapped
 
-let is_between x lower_bound upper_bound =
-  x >= lower_bound && x <= upper_bound
-
+(* 
+let is_between x lower_bound upper_bound = 
+ x >= lower_bound && x <= upper_bound
+*)  
 let parse_numbers str = 
  let parts = String.split str ~on:' ' in
  List.fold parts ~f:(fun numbers string -> 
@@ -22,20 +24,52 @@ let parse_seeds line =
   let seeds = parse_numbers seeds_part in
   seeds
 
+let split_number_range (number, range) (split_number, split_range) =
+  if number < split_number && number + range < split_number then [((number, range), NotMapped)]
+  else if number > (split_number + split_range) then [((number, range), NotMapped)]
+  else if number >= split_number && (number + range) >= split_number then
+    if (split_number + split_range) >= (number + range) then
+    [((number, range), ToBeMapped)] else
+    let mapped_range = (split_number + split_range - number) in
+    [((number,  mapped_range), ToBeMapped); ((number + mapped_range + 1, number + range - ( split_number + split_range + 1)), NotMapped)]
+  else if number <= split_number && split_number < (number + range) then
+    let before_split_range = if number = split_number then []
+    else [((number, split_number - number - 1), NotMapped)] in
+    if (number + range) > (split_number + split_range) then
+    before_split_range @ [((split_number, split_range), ToBeMapped); ((split_number + split_range + 1, number + range - (split_number + split_range + 1)), NotMapped)]
+    else 
+    before_split_range @ [((split_number, number + range - split_number), ToBeMapped)]
+  else 
+    [((number, range), NotMapped)]
+    
 
-let get_next_type line (source_mapping: (int * mapping_type)) = 
-  let (source, mapping) = source_mapping in
+let get_next_type line (source_mapping: ((int * int) * mapping_type)) = 
+  let ((source, source_range), mapping) = source_mapping in
   match mapping with
-    | Mapped -> source_mapping
+    | Mapped -> [source_mapping]
     | NotMapped ->
   let destination_map = parse_numbers line in
-  match destination_map with
-  | [destination_start; source_start; range] -> (
-      if is_between source source_start (source_start + range) then
-        (destination_start + source - source_start, Mapped)
-      else source_mapping
+    (match destination_map with
+    | [destination_start; source_start; mapping_range] -> (
+        (* find out if our range of source_mapping is in the range of destination_map create source_mapping ranges mapped and not mapped *)
+        let number_ranges = split_number_range (source, source_range) (source_start, mapping_range) in
+        print_endline (Printf.sprintf "Debug source: %d, %d, MappingStart: %d Destination:%d mapping_range: %d" source source_range source_start destination_start mapping_range);
+        List.map number_ranges ~f:(fun ((number, range), mapping) -> 
+          (match mapping with
+         | ToBeMapped -> (
+          print_endline (Printf.sprintf "mapping to_be_mapped_source: %d, %d" number range);
+          ((number - (source_start - destination_start), range), Mapped)
+          ) 
+         | m -> (
+         print_endline (Printf.sprintf "not mapping: %d, %d" number range);
+    ((number, range), m)
     )
-  | _ -> source_mapping 
+        ))
+        (*if is_between source source_start (source_start + range) then
+          (destination_start + source - source_start, Mapped) *)
+    )
+    | _ -> [source_mapping])
+  | _ -> [source_mapping]
 
 let reset_mapping source_mapping =
   let (source, _mapping) = source_mapping in
@@ -48,12 +82,12 @@ let play_game source_mappings line =
       let pairs = List.chunks_of ~length:2 seeds in
       let ranges = List.map pairs ~f:(fun pair -> 
       match pair with
-       | [start; range] -> List.range start (start+range-1) 
+       | [start; range] -> [((start, range), NotMapped)]
        | _ -> []
       ) in
-    List.concat ranges |> List.map ~f:(fun seed -> (seed, NotMapped))
+    List.concat ranges
   | l when String.contains l ':' -> List.map source_mappings ~f:reset_mapping
-  | _ -> List.map source_mappings ~f:(get_next_type line)
+  | _ -> List.concat (List.map source_mappings ~f:(get_next_type line))
  
 
 let read_file filename =
@@ -71,8 +105,8 @@ let read_file filename =
     done;
     with End_of_file ->
     Stdio.In_channel.close file; 
-    let (first_source_value, _map) = List.hd_exn !source_mappings in
-    let lowest_source = List.fold !source_mappings ~init:first_source_value ~f:(fun acc (value, _) -> if value < acc then value else acc) in
+    let ((first_source_value, _range), _map) = List.hd_exn !source_mappings in
+    let lowest_source = List.fold !source_mappings ~init:first_source_value ~f:(fun acc ((value, _range), _) -> if value < acc then value else acc) in
     print_endline (Printf.sprintf "Lowest ending source: %d" lowest_source);
   with Sys_error msg ->
     print_endline (Printf.sprintf "Error: %s\n" msg)
