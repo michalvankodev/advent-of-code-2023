@@ -19,10 +19,10 @@ let all_same row  =
   List.all_equal row ~equal:(fun a b -> a = b)
  
 let rec get_prediction row = 
-  let last_number =  (List.last_exn row) in
+  let first_number =  (List.hd_exn row) in
   let diff_row = get_diff_between_numbers row in
-  if Option.is_some(all_same diff_row) then last_number + (List.last_exn diff_row)
-  else last_number + get_prediction diff_row
+  if Option.is_some(all_same diff_row) then first_number - (List.hd_exn diff_row)
+  else first_number - get_prediction diff_row
 
 let predict_next_number line =
   let row = parse_numbers line in
