@@ -14,7 +14,7 @@ let rec get_combinations times =
 
 
 let () =
-  let test1 = get_combinations 5 in
+  let test1 = get_combinations 4 in
   let _map = List.map test1 ~f:(fun row ->
     let _ = List.map row ~f:(fun char ->
         print_string (Printf.sprintf "%c" char);

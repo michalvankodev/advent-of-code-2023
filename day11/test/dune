@@ -1,2 +1,3 @@
 (test
- (name day11))
+ (name day11)
+ (libraries day11 base core stdio str))
